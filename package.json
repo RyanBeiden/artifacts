@@ -1,0 +1,16 @@
+{
+  "name": "artifacts",
+  "version": "1.0.0",
+  "description": "Scripts for automating the Artifacts MMORPG",
+  "main": "index.js",
+  "type": "module",
+  "keywords": [
+    "MMORPG"
+  ],
+  "author": "RyanBeiden",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.8.1",
+    "dotenv": "^16.4.7"
+  }
+}
