@@ -1,50 +1,64 @@
-import request from "./index.js";
-import { exists } from "./helper.js";
-import { chickens } from "./maps.js";
-import { move } from "./move.js";
+import { delay, logInfo } from "./helper.js";
+import { fetchMaps } from "./maps.js";
+import { fetchMonster } from "./monsters.js";
+import { fetchCharacter } from "./characters.js";
+import { move, rest, fight } from "./actions.js";
 
 const NAME = 'chunt';
+const MONSTER = 'yellow_slime';
+const MAX_ATTACKS = 5;
 
-request.get('/my/characters')
-  .then((response) => response.data)
-  .then((responseData) => {
-    const character = responseData.data.find((character) => character.name === NAME);
+let attackCount = 0;
 
-    if (!exists(character)) {
-      console.error(`Character ${NAME} not found.`);
+// @TODO: Fetch highest rated monster that chunt could kill.
+// @TODO: Stop if inventory gets maxed out (maybe utlize the bank).
+// @TODO: Rest at the start to ensure max HP.
+// @TODO: Maybe I hard code the character name, map location, and monster and just occassionally verify it still works.
+//        Then I would only need to run `attack()`. The nesting is getting out of hand...
+
+fetchCharacter(NAME)
+  .then((character) => {
+    fetchMaps(MONSTER)
+      .then((maps) => delay(character).then(() => handleActions(character, maps[0])))
+      .catch((error) => console.error(error));
+  })
+  .catch((error) => console.error(error));
+
+// ----------------------------------------------- Functions ----------------------------------------------- //
+
+async function handleActions(character, location) {
+  return await move(character, location)
+    .then((character) => {
+      fetchMonster(location.content.code)
+        .then((monster) => delay(character).then(() => attack(character, monster)))
+        .catch((error) => console.error(error));
+    })
+    .catch((error) => console.error(error));
+};
+
+async function attack(character, monster) {
+  if (character.hp <= monster.hp) {
+    // Rest or chunt will die!
+    return await delay(character).then(() => rest(character)
+      .then((restedCharacter) => attack(restedCharacter, monster))
+      .catch((error) => console.error(error))
+    );
+  }
+
+  return await delay(character).then(() => fight(character)
+    .then((victoriousCharacter) => {
+      attackCount++;
+
+      if (attackCount < MAX_ATTACKS) {
+        logInfo(`Attacks completed: ${attackCount}`);
+
+        return delay(character).then(() => attack(victoriousCharacter, monster));
+      }
+
+      logInfo(`Attacking complete. Current level: ${victoriousCharacter.level}`);
 
       return;
-    }
-
-    moveToChicken(character);
-  });
-
-function moveToChicken(character) {
-  chickens().then((responseData) => {
-    const chickenLocations = responseData.data;
-
-    if (chickenLocations.length === 0) {
-      console.error('No chickens found.');
-
-      return;
-    }
-
-    const firstChicken = chickenLocations[0];
-
-    const { x, y } = firstChicken;
-
-    if (!exists(x) || !exists(y)) {
-      console.error('Coordinates not found.');
-
-      return;
-    }
-
-    if (character.x !== x || character.y !== y) {
-      move(character, x, y);
-    }
-
-    // @TODO: Attack!
-
-    return;
-  });
+    })
+    .catch((error) => console.error(error))
+  );
 };
