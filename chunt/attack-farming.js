@@ -65,7 +65,7 @@ async function attack(character, monster) {
         attackCount++;
 
         if (attackCount < maxAttacks) {
-          logInfo(`Attacks completed: ${attackCount}`);
+          logInfo(`Attacks completed: ${attackCount}/${maxAttacks}`);
 
           return delay(character).then(() =>
             attack(victoriousCharacter, monster),

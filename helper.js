@@ -11,7 +11,8 @@ export async function delay(character) {
 }
 
 export function logInfo(message) {
-  console.info(`--- ${message} ---`);
+  console.info(message);
+  console.info('----------------------------');
 }
 
 export function errorMessage(error) {
