@@ -1,8 +1,8 @@
-import { delay, logInfo } from "./helper.js";
-import { fetchMaps } from "./maps.js";
-import { fetchMonster } from "./monsters.js";
-import { fetchCharacter } from "./characters.js";
-import { move, rest, fight } from "./actions.js";
+import { delay, logInfo } from "../helper.js";
+import { move, rest, fight } from "../characters/actions.js";
+import { fetchMaps } from "../fetches/maps.js";
+import { fetchMonster } from "../fetches/monsters.js";
+import { fetchCharacter } from "../fetches/characters.js";
 
 const NAME = 'chunt';
 const MONSTER = 'yellow_slime';

@@ -1,5 +1,5 @@
-import request from './index.js';
-import { errorMessage } from './helper.js';
+import request from '../index.js';
+import { errorMessage } from '../helper.js';
 
 export async function fetchMaps(contentCode = '') {
   try {
