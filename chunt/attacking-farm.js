@@ -5,10 +5,8 @@ import { fetchMonster } from "../fetches/monsters.js";
 import { fetchCharacter } from "../fetches/characters.js";
 
 const NAME = "chunt";
-const MONSTER = "yellow_slime";
-const MAX_ATTACKS = 5;
-
-let attackCount = 0;
+const MONSTER_PREFIX = "MONSTER=";
+const MAX_ATTACKS_PREFIX = "MAX_ATTACKS=";
 
 // @TODO: Fetch highest rated monster that chunt could kill.
 // @TODO: Stop if inventory gets maxed out (maybe utlize the bank).
@@ -16,9 +14,20 @@ let attackCount = 0;
 // @TODO: Maybe I hard code the character name, map location, and monster and just occassionally verify it still works.
 //        Then I would only need to run `attack()`. The nesting is getting out of hand...
 
+const monsterCode = process.argv.find((arg) => arg.startsWith(MONSTER_PREFIX)).replace(MONSTER_PREFIX, '');
+const maxAttacks = process.argv.find((arg) => arg.startsWith(MAX_ATTACKS_PREFIX)).replace(MAX_ATTACKS_PREFIX, '');
+
+let attackCount = 0;
+
 fetchCharacter(NAME)
   .then((character) => {
-    fetchMaps(MONSTER)
+    if (monsterCode === '' || maxAttacks === 0) {
+      logInfo('MONSTER and MAX_ATTACKS arguments are required to farm.');
+
+      return;
+    }
+
+    fetchMaps(monsterCode)
       .then((maps) =>
         delay(character).then(() => handleActions(character, maps[0])),
       )
@@ -55,7 +64,7 @@ async function attack(character, monster) {
       .then((victoriousCharacter) => {
         attackCount++;
 
-        if (attackCount < MAX_ATTACKS) {
+        if (attackCount < maxAttacks) {
           logInfo(`Attacks completed: ${attackCount}`);
 
           return delay(character).then(() =>
