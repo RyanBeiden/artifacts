@@ -4,8 +4,8 @@ import { fetchMaps } from "../fetches/maps.js";
 import { fetchMonster } from "../fetches/monsters.js";
 import { fetchCharacter } from "../fetches/characters.js";
 
-const NAME = 'chunt';
-const MONSTER = 'yellow_slime';
+const NAME = "chunt";
+const MONSTER = "yellow_slime";
 const MAX_ATTACKS = 5;
 
 let attackCount = 0;
@@ -19,7 +19,9 @@ let attackCount = 0;
 fetchCharacter(NAME)
   .then((character) => {
     fetchMaps(MONSTER)
-      .then((maps) => delay(character).then(() => handleActions(character, maps[0])))
+      .then((maps) =>
+        delay(character).then(() => handleActions(character, maps[0])),
+      )
       .catch((error) => console.error(error));
   })
   .catch((error) => console.error(error));
@@ -30,35 +32,43 @@ async function handleActions(character, location) {
   return await move(character, location)
     .then((character) => {
       fetchMonster(location.content.code)
-        .then((monster) => delay(character).then(() => attack(character, monster)))
+        .then((monster) =>
+          delay(character).then(() => attack(character, monster)),
+        )
         .catch((error) => console.error(error));
     })
     .catch((error) => console.error(error));
-};
+}
 
 async function attack(character, monster) {
   if (character.hp <= monster.hp) {
     // Rest or chunt will die!
-    return await delay(character).then(() => rest(character)
-      .then((restedCharacter) => attack(restedCharacter, monster))
-      .catch((error) => console.error(error))
+    return await delay(character).then(() =>
+      rest(character)
+        .then((restedCharacter) => attack(restedCharacter, monster))
+        .catch((error) => console.error(error)),
     );
   }
 
-  return await delay(character).then(() => fight(character)
-    .then((victoriousCharacter) => {
-      attackCount++;
+  return await delay(character).then(() =>
+    fight(character)
+      .then((victoriousCharacter) => {
+        attackCount++;
 
-      if (attackCount < MAX_ATTACKS) {
-        logInfo(`Attacks completed: ${attackCount}`);
+        if (attackCount < MAX_ATTACKS) {
+          logInfo(`Attacks completed: ${attackCount}`);
 
-        return delay(character).then(() => attack(victoriousCharacter, monster));
-      }
+          return delay(character).then(() =>
+            attack(victoriousCharacter, monster),
+          );
+        }
 
-      logInfo(`Attacking complete. Current level: ${victoriousCharacter.level}`);
+        logInfo(
+          `Attacking complete. Current level: ${victoriousCharacter.level}`,
+        );
 
-      return;
-    })
-    .catch((error) => console.error(error))
+        return;
+      })
+      .catch((error) => console.error(error)),
   );
-};
+}

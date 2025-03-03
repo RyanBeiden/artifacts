@@ -1,13 +1,13 @@
-import request from '../index.js';
-import { errorMessage } from '../helper.js';
+import request from "../index.js";
+import { errorMessage } from "../helper.js";
 
-export async function fetchMaps(contentCode = '') {
+export async function fetchMaps(contentCode = "") {
   try {
-    const mapsUrl = contentCode !== ''
-      ? `maps?content_code=${contentCode}`
-      : 'maps';
+    const mapsUrl =
+      contentCode !== "" ? `maps?content_code=${contentCode}` : "maps";
 
-    return await request.get(mapsUrl)
+    return await request
+      .get(mapsUrl)
       .then((response) => response.data)
       .then((maps) => {
         if (maps.data.length === 0) {
@@ -19,4 +19,4 @@ export async function fetchMaps(contentCode = '') {
   } catch (error) {
     throw errorMessage(error);
   }
-};
+}

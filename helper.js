@@ -1,20 +1,18 @@
 import moment from "moment";
 
 export function exists(value) {
-  return typeof value !== 'undefined'; 
-};
+  return typeof value !== "undefined";
+}
 
 export async function delay(character) {
   const difference = moment(character.cooldown_expiration).diff(moment());
 
-  await new Promise(resolve => (
-    setTimeout(resolve, Math.max(difference, 0))
-  ));
-};
+  await new Promise((resolve) => setTimeout(resolve, Math.max(difference, 0)));
+}
 
 export function logInfo(message) {
   console.info(`--- ${message} ---`);
-};
+}
 
 export function errorMessage(error) {
   try {
@@ -22,4 +20,4 @@ export function errorMessage(error) {
   } catch {
     return new Error(error);
   }
-};
+}
