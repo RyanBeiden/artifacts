@@ -53,7 +53,34 @@ export async function move(character, location) {
       .post(`/my/${character.name}/action/move`, { x, y })
       .then((response) => response.data)
       .then((responseData) => {
-        logInfo(`${character.name} moved to (${x}, ${y})`);
+        logInfo(
+          `${character.name} moved to: ${responseData.data.destination.content.type} (${x}, ${y})`,
+        );
+
+        return responseData.data.character;
+      });
+  } catch (error) {
+    throw errorMessage(error);
+  }
+}
+
+export async function depositGold(character) {
+  try {
+    const quantity = character.gold;
+
+    if (quantity < 1) {
+      logInfo(`${character.name} has no gold to deposit`);
+
+      return;
+    }
+
+    return await request
+      .post(`/my/${character.name}/action/bank/deposit/gold`, { quantity })
+      .then((response) => response.data)
+      .then((responseData) => {
+        logInfo(
+          `${quantity} gold deposited to the bank - Total gold: ${responseData.data.bank.quantity}`,
+        );
 
         return responseData.data.character;
       });

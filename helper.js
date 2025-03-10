@@ -12,12 +12,17 @@ export async function delay(character) {
 
 export function logInfo(message) {
   console.info(message);
-  console.info('----------------------------');
+  console.info("----------------------------");
 }
 
 export function errorMessage(error) {
   try {
-    return new Error(error.response.data.error.message);
+    const errorObject = error.response.data.error;
+    const thrownError = new Error(errorObject.message);
+
+    thrownError.code = errorObject.code;
+
+    return thrownError;
   } catch {
     return new Error(error);
   }
