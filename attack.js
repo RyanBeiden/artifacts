@@ -1,8 +1,8 @@
-import { logInfo } from "../helper.js";
-import { move, rest, fight, depositGold } from "../characters/actions.js";
-import { fetchMaps } from "../fetches/maps.js";
-import { fetchMonster } from "../fetches/monsters.js";
-import { fetchCharacter } from "../fetches/characters.js";
+import { logInfo } from "./helper.js";
+import { move, rest, fight, depositGold } from "./characters/actions.js";
+import { fetchMaps } from "./fetches/maps.js";
+import { fetchMonster } from "./fetches/monsters.js";
+import { fetchCharacter } from "./fetches/characters.js";
 
 const NAME_PREFIX = "CHARACTER=";
 const MONSTER_PREFIX = "MONSTER=";
