@@ -1,7 +1,36 @@
 import request from "../index.js";
 import { delay, errorMessage, exists, logInfo } from "../helpers/utilities.js";
+import { fetchItems } from "../fetches/items.js";
 
 export async function rest(character) {
+  const consumables = await fetchItems("", 0, "consumable");
+
+  const healingConsumables = consumables.filter((consumable) => {
+    return consumable.effects.map((effect) => effect.code).includes('heal');
+  });
+
+  const inventoryOfConsumables = character.inventory.map((inventoryItem) => {
+    const consumable = healingConsumables.find((consumable) => consumable.code === inventoryItem.code);
+
+    if (exists(consumable)) {
+      return {
+        ...inventoryItem,
+        heal: consumable.effects.reduce((accumulator, currentValue) => accumulator + currentValue.value, 0),
+      };
+    }
+
+    return;
+  }).filter((inventory) => exists(inventory));
+
+  if (inventoryOfConsumables.length > 0) {
+    const requiredAmountForFullHeal = (character.max_hp - character.hp);
+
+    console.log(requiredAmountForFullHeal);
+
+    return;
+    // return use(character, item);
+  }
+
   return delay(character).then(() =>
     // @TODO: If the character has consumables, use them before resting.
 
@@ -94,6 +123,20 @@ export async function craft(character, code, quantity) {
       .then((response) => response.data)
       .then((responseData) => {
         logInfo(`Total ${code} crafted: ${quantity}`);
+
+        return responseData.data.character;
+      })
+      .catch((error) => errorMessage(error)),
+  );
+}
+
+export async function use(character, code, quantity) {
+  return delay(character).then(() =>
+    request
+      .post(`/my/${character.name}/action/use`, { code, quantity })
+      .then((response) => response.data)
+      .then((responseData) => {
+        logInfo(`Total ${code} consumed: ${quantity}`);
 
         return responseData.data.character;
       })

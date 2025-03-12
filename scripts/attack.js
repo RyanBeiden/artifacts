@@ -11,7 +11,7 @@ import {
 } from "../helpers/arguments.js";
 
 // @TODO: Fetch highest rated monster that the character could kill.
-// @TODO: Stop if inventory gets maxed out (maybe utlize the bank).
+// @TODO: Stop if inventory gets maxed out (maybe utilize the bank).
 // @TODO: Rest at the start to ensure max HP.
 
 let attackCount = 0;
@@ -24,19 +24,24 @@ try {
   const monster = await fetchMonster(monsterCode);
   const character = await fetchCharacter(characterName);
 
-  // Move and attack
-  const map = await fetchMaps(monsterCode);
-  const characterAtMonster = await move(character, map[0]);
-  const victoriousCharacter = await attack(
-    characterAtMonster,
-    monster,
-    maxAttacks,
-  );
+  // Get full health before we begin
+  const restedCharacter = (character.hp < character.max_hp)
+    ? await rest(character)
+    : character;
 
-  // Move and deposit gold
-  const bank = await fetchMaps(BANK);
-  const characterAtBank = await move(victoriousCharacter, bank[0]);
-  const characterAfterGoldDeposit = await depositGold(characterAtBank);
+  // Move and attack
+  // const map = await fetchMaps(monsterCode);
+  // const characterAtMonster = await move(restedCharacter, map[0]);
+  // const victoriousCharacter = await attack(
+  //   characterAtMonster,
+  //   monster,
+  //   maxAttacks,
+  // );
+
+  // // Move and deposit gold
+  // const bank = await fetchMaps(BANK);
+  // const characterAtBank = await move(victoriousCharacter, bank[0]);
+  // const characterAfterGoldDeposit = await depositGold(characterAtBank);
 
   logInfo(`${characterAfterGoldDeposit.name} attack farming complete!`);
 } catch (error) {}
