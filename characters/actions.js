@@ -1,9 +1,9 @@
 import request from "../index.js";
-import { errorMessage, exists, logInfo } from "../helper.js";
+import { delay, errorMessage, exists, logInfo } from "../helper.js";
 
 export async function rest(character) {
-  try {
-    return await request
+  return delay(character).then(() =>
+    request
       .post(`/my/${character.name}/action/rest`)
       .then((response) => response.data)
       .then((responseData) => {
@@ -12,15 +12,14 @@ export async function rest(character) {
         );
 
         return responseData.data.character;
-      });
-  } catch (error) {
-    throw errorMessage(error);
-  }
+      })
+      .catch((error) => errorMessage(error)),
+  );
 }
 
 export async function fight(character) {
-  try {
-    return await request
+  return delay(character).then(() =>
+    request
       .post(`/my/${character.name}/action/fight`)
       .then((response) => response.data)
       .then((responseData) => {
@@ -29,27 +28,26 @@ export async function fight(character) {
         );
 
         return responseData.data.character;
-      });
-  } catch (error) {
-    throw errorMessage(error);
-  }
+      })
+      .catch((error) => errorMessage(error)),
+  );
 }
 
 export async function move(character, location) {
-  try {
-    const { x, y, content } = location;
+  const { x, y, content } = location;
 
-    if (!exists(x) || !exists(y) || !exists(content)) {
-      throw "Coordinates not found.";
-    }
+  if (!exists(x) || !exists(y) || !exists(content)) {
+    throw "Coordinates not found.";
+  }
 
-    if (character.x === x && character.y === y) {
-      logInfo(`${character.name} is already at (${x}, ${y})`);
+  if (character.x === x && character.y === y) {
+    logInfo(`${character.name} is already at (${x}, ${y})`);
 
-      return character;
-    }
+    return character;
+  }
 
-    return request
+  return delay(character).then(() =>
+    request
       .post(`/my/${character.name}/action/move`, { x, y })
       .then((response) => response.data)
       .then((responseData) => {
@@ -58,23 +56,22 @@ export async function move(character, location) {
         );
 
         return responseData.data.character;
-      });
-  } catch (error) {
-    throw errorMessage(error);
-  }
+      })
+      .catch((error) => errorMessage(error)),
+  );
 }
 
 export async function depositGold(character) {
-  try {
-    const quantity = character.gold;
+  const quantity = character.gold;
 
-    if (quantity < 1) {
-      logInfo(`${character.name} has no gold to deposit`);
+  if (quantity < 1) {
+    logInfo(`${character.name} has no gold to deposit`);
 
-      return;
-    }
+    return;
+  }
 
-    return await request
+  return delay(character).then(() =>
+    request
       .post(`/my/${character.name}/action/bank/deposit/gold`, { quantity })
       .then((response) => response.data)
       .then((responseData) => {
@@ -83,8 +80,7 @@ export async function depositGold(character) {
         );
 
         return responseData.data.character;
-      });
-  } catch (error) {
-    throw errorMessage(error);
-  }
+      })
+      .catch((error) => errorMessage(error)),
+  );
 }

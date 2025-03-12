@@ -4,10 +4,13 @@ export function exists(value) {
   return typeof value !== "undefined";
 }
 
-export async function delay(character) {
-  const difference = moment(character.cooldown_expiration).diff(moment());
+export function delay(character) {
+  const now = moment().utc();
+  const expiration = moment(character.cooldown_expiration).utc();
 
-  await new Promise((resolve) => setTimeout(resolve, Math.max(difference, 0)));
+  const difference = expiration.diff(now) + 225;
+
+  return new Promise((resolve) => setTimeout(resolve, Math.max(difference, 0)));
 }
 
 export function logInfo(message) {
@@ -22,8 +25,8 @@ export function errorMessage(error) {
 
     thrownError.code = errorObject.code;
 
-    return thrownError;
+    console.error(thrownError);
   } catch {
-    return new Error(error);
+    console.error(new Error(error));
   }
 }

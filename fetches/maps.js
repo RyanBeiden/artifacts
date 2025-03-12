@@ -1,22 +1,18 @@
 import request from "../index.js";
 import { errorMessage } from "../helper.js";
 
-export async function fetchMaps(contentCode = "") {
-  try {
-    const mapsUrl =
-      contentCode !== "" ? `maps?content_code=${contentCode}` : "maps";
+export async function fetchMaps(content = "") {
+  const mapsUrl = content !== "" ? `maps?content_code=${content}` : "maps";
 
-    return await request
-      .get(mapsUrl)
-      .then((response) => response.data)
-      .then((maps) => {
-        if (maps.data.length === 0) {
-          throw `No maps for ${contentCode} found.`;
-        }
+  return request
+    .get(mapsUrl)
+    .then((response) => response.data)
+    .then((maps) => {
+      if (maps.data.length === 0) {
+        throw `No maps for ${content} found.`;
+      }
 
-        return maps.data;
-      });
-  } catch (error) {
-    throw errorMessage(error);
-  }
+      return maps.data;
+    })
+    .catch((error) => errorMessage(error));
 }

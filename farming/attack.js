@@ -1,13 +1,14 @@
-import { delay, logInfo } from "../helper.js";
-import { move, rest, fight } from "../characters/actions.js";
+import { logInfo } from "../helper.js";
+import { move, rest, fight, depositGold } from "../characters/actions.js";
 import { fetchMaps } from "../fetches/maps.js";
 import { fetchMonster } from "../fetches/monsters.js";
 import { fetchCharacter } from "../fetches/characters.js";
-import { moveAndDepositGold } from "../destinations/bank.js";
 
 const NAME_PREFIX = "CHARACTER=";
 const MONSTER_PREFIX = "MONSTER=";
 const MAX_ATTACKS_PREFIX = "MAX_ATTACKS=";
+
+const BANK = "bank";
 
 // @TODO: Fetch highest rated monster that the character could kill.
 // @TODO: Stop if inventory gets maxed out (maybe utlize the bank).
@@ -25,81 +26,45 @@ const maxAttacks = process.argv
 
 let attackCount = 0;
 
-// --------------------------------------------------- Init --------------------------------------------------- //
+try {
+  // @TODO: Find closest map since it changes cooldown time
+  const monster = await fetchMonster(monsterCode);
+  const character = await fetchCharacter(characterName);
 
-fetchCharacter(characterName)
-  .then((character) => handleMapActions(character))
-  .catch((error) => console.error(error));
+  // Move and attack
+  const map = await fetchMaps(monsterCode);
+  const characterAtMonster = await move(character, map[0]);
+  const victoriousCharacter = await attack(characterAtMonster, monster);
 
-// ----------------------------------------------- Action Chain ----------------------------------------------- //
+  // Move and deposit gold
+  const bank = await fetchMaps(BANK);
+  const characterAtBank = await move(victoriousCharacter, bank[0]);
+  const characterAfterGoldDeposit = await depositGold(characterAtBank);
 
-async function handleMapActions(character) {
-  return await fetchMaps(monsterCode)
-    .then((maps) =>
-      delay(character).then(() => handleMoveActions(character, maps[0])),
-    )
-    .catch((error) => console.error(error));
-}
-
-async function handleMoveActions(character, location) {
-  return await delay(character).then(() =>
-    move(character, location)
-      .then((movedCharacter) => handleMonsterActions(movedCharacter, location))
-      .catch((error) => console.error(error)),
-  );
-}
-
-async function handleMonsterActions(character, location) {
-  return await fetchMonster(location.content.code)
-    .then((monster) => handleAttackActions(character, monster))
-    .catch((error) => console.error(error));
-}
-
-async function handleAttackActions(character, monster) {
-  return await delay(character).then(() =>
-    attack(character, monster).then((victoriousCharacter) =>
-      delay(victoriousCharacter).then(() =>
-        moveAndDepositGold(victoriousCharacter),
-      ),
-    ),
-  );
-}
-
-async function handleRestActions(character, monster) {
-  return await delay(character).then(() =>
-    rest(character)
-      .then((restedCharacter) => attack(restedCharacter, monster))
-      .catch((error) => console.error(error)),
-  );
-}
-
-// ------------------------------------------------ Farm Loop ------------------------------------------------ //
+  logInfo(`${characterAfterGoldDeposit.name} attack farming complete!`);
+} catch (error) {}
 
 async function attack(character, monster) {
   if (character.hp <= monster.hp) {
     // Rest or your character will die!
-    return await handleRestActions(character, monster);
+    const restedCharacter = await rest(character);
+
+    return attack(restedCharacter, monster);
   }
 
-  return await delay(character).then(() =>
-    fight(character)
-      .then((victoriousCharacter) => {
-        attackCount++;
+  if (attackCount > 0) {
+    logInfo(`Attacks completed: ${attackCount}/${maxAttacks}`);
+  }
 
-        if (attackCount < maxAttacks) {
-          logInfo(`Attacks completed: ${attackCount}/${maxAttacks}`);
+  attackCount++;
 
-          return delay(character).then(() =>
-            attack(victoriousCharacter, monster),
-          );
-        }
+  const victoriousCharacter = await fight(character);
 
-        logInfo(
-          `Attacking complete. Current level: ${victoriousCharacter.level}`,
-        );
+  if (attackCount < maxAttacks) {
+    return attack(victoriousCharacter, monster);
+  }
 
-        return victoriousCharacter;
-      })
-      .catch((error) => console.error(error)),
-  );
+  logInfo(`Attacking complete. Current level: ${victoriousCharacter.level}`);
+
+  return victoriousCharacter;
 }
