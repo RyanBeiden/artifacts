@@ -1,8 +1,10 @@
 import request from "../index.js";
-import { delay, errorMessage, exists, logInfo } from "../helper.js";
+import { delay, errorMessage, exists, logInfo } from "../helpers/utilities.js";
 
 export async function rest(character) {
   return delay(character).then(() =>
+    // @TODO: If the character has consumables, use them before resting.
+
     request
       .post(`/my/${character.name}/action/rest`)
       .then((response) => response.data)
@@ -78,6 +80,20 @@ export async function depositGold(character) {
         logInfo(
           `${quantity} gold deposited to the bank - Total gold: ${responseData.data.bank.quantity}`,
         );
+
+        return responseData.data.character;
+      })
+      .catch((error) => errorMessage(error)),
+  );
+}
+
+export async function craft(character, code, quantity) {
+  return delay(character).then(() =>
+    request
+      .post(`/my/${character.name}/action/crafting`, { code, quantity })
+      .then((response) => response.data)
+      .then((responseData) => {
+        logInfo(`Total ${code} crafted: ${quantity}`);
 
         return responseData.data.character;
       })

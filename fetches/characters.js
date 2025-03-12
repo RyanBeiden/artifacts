@@ -1,5 +1,5 @@
 import request from "../index.js";
-import { errorMessage } from "../helper.js";
+import { errorMessage } from "../helpers/utilities.js";
 
 export async function fetchCharacter(name) {
   return request

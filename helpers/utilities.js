@@ -1,7 +1,7 @@
 import moment from "moment";
 
 export function exists(value) {
-  return typeof value !== "undefined";
+  return typeof value !== "undefined" && value !== "" && value !== 0;
 }
 
 export function delay(character) {
