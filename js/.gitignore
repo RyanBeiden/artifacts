@@ -1,5 +1,5 @@
-js/node_modules
-js/.env
-js/.cache
-js/versions
-js/alias
+/node_modules
+/.env
+/.cache
+/versions
+/alias
