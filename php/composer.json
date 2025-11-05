@@ -7,14 +7,17 @@
         "php": ">=8.2",
         "ext-ctype": "*",
         "ext-iconv": "*",
+        "ext-json": "*",
+        "ext-zlib": "*",
+        "illuminate/collections": "^12.36",
         "symfony/console": "7.3.*",
         "symfony/dotenv": "7.3.*",
         "symfony/flex": "^2",
         "symfony/framework-bundle": "7.3.*",
+        "symfony/http-client": "7.3.*",
         "symfony/runtime": "7.3.*",
-        "symfony/yaml": "7.3.*"
-    },
-    "require-dev": {
+        "symfony/yaml": "7.3.*",
+        "team-reflex/discord-php": "^10.40"
     },
     "config": {
         "allow-plugins": {

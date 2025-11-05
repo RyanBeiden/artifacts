@@ -8,6 +8,15 @@ framework:
     #esi: true
     #fragments: true
 
+    http_client:
+        scoped_clients:
+            client:
+                base_uri: '%env(BASE_URI)%'
+                headers:
+                    'Accept': 'application/json'
+                    'Authorization': 'Bearer %env(TOKEN)%'
+                    'Content-Type': 'application/json'
+
 when@test:
     framework:
         test: true
