@@ -181,41 +181,6 @@ class MiningCommand
         );
 
         // @TODO: Get nearest bank location first.
-        $io->comment("Moving character to the bank");
-
-                $nearestMap = $characterService->mapNearestToCharacter(
-            $maps,
-            $characterX,
-            $characterY
-        );
-
-        if (!$nearestMap) {
-            $io->warning("No valid resource maps found for {$resource['name']}");
-
-            return Command::SUCCESS;
-        }
-
-        if ($nearestMap['x'] !== $characterX || $nearestMap['y'] !== $characterY) {
-            $io->comment("Moving character to ({$nearestMap['x']}, {$nearestMap['y']})");
-
-            $moveResponse = $mapService->move(
-                $this->client,
-                $character,
-                $nearestMap['x'],
-                $nearestMap['y'],
-                $nearestMap['map_id']
-            );
-
-            if ($moveResponse->has('error')) {
-                return $responseHelper->handleError($moveResponse, $io);
-            }
-
-            if ($moveResponse->has('cooldown')) {
-                $cooldown = $moveResponse->get('cooldown');
-
-                $cooldownHelper->handleCooldown($cooldown, $io, $output);
-            }
-        }
 
         $moveResponse = $mapService->move(
             $this->client,
