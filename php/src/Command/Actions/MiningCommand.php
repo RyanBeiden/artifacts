@@ -2,15 +2,14 @@
 
 namespace App\Command\Actions;
 
-use App\Enums\Endpoints;
-use App\Helpers\Cooldown;
+use App\Exceptions\ApiException;
+use App\Exceptions\ConditionsNotMetException;
+use App\Helpers\CooldownHelper;
+use App\Helpers\DropHelper;
 use App\Helpers\IoBlocks;
-use App\Helpers\Responses;
+use App\Models\Map;
+use App\Models\Resource;
 use App\Service\ApiService;
-use App\Service\CharacterService;
-use App\Service\ItemService;
-use App\Service\MapService;
-use App\Service\ResourceService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\FormatterHelper;
@@ -29,6 +28,7 @@ class MiningCommand
     public function __construct(private ApiService $client) {}
 
     /**
+     * @param SymfonyStyle $io
      * @param InputInterface $input
      * @param OutputInterface $output
      *
@@ -36,62 +36,66 @@ class MiningCommand
      */
     public function __invoke(SymfonyStyle $io, InputInterface $input, OutputInterface $output): int
     {
-        $questionHelper = new QuestionHelper();
+        /* ---------------------- Setup ---------------------- */
+
+        $questionHelper  = new QuestionHelper();
         $formatterHelper = new FormatterHelper();
-        $cooldownHelper = new Cooldown();
-        $responseHelper = new Responses();
+        $cooldownHelper  = new CooldownHelper($io, $output);
+        $dropHelper      = new DropHelper();
 
-        $characterService = new CharacterService($this->client);
-        $mapService = new MapService($this->client);
-        $resourceService = new ResourceService($this->client);
-        $itemService = new ItemService();
+        /* --------------------------------------------------- */
 
-        $characterNames = $characterService->characterNames($this->client);
+        try {
+            $myCharacters   = $this->client->getMyCharacters();
+            $characterNames = $myCharacters->pluck('name')->toArray();
+        } catch (ApiException $e) {
+            $io->error($e->getMessage());
 
-        $formattedLine = $formatterHelper->formatSection(
-            "Choose a character",
-            "",
-            "question"
-        );
-
-        $characterQuestion = new ChoiceQuestion($formattedLine, $characterNames, 0);
-        $characterQuestion->setErrorMessage('Character name is invalid');
-
-        $character = $questionHelper->ask($input, $output, $characterQuestion);
-
-        $characterResponse = $this->client->get(Endpoints::Characters, [$character]);
-
-        if ($characterResponse->has('error')) {
-            return $responseHelper->handleError($characterResponse, $io);
+            return Command::FAILURE;
         }
 
-        $miningLevel = $characterResponse->get('mining_level', 1);
-        $maxInventory = $characterResponse->get('inventory_max_items');
-        $currentInventory = collect($characterResponse->get('inventory'))->sum('quantity');
+        $formattedLine     = $formatterHelper->formatSection("Choose a character", "", "question");
+        $characterQuestion = new ChoiceQuestion($formattedLine, $characterNames, 0);
+        $characterQuestion->setErrorMessage('Character does not exist');
 
-        if ($currentInventory === $maxInventory) {
+        $characterName = $questionHelper->ask($input, $output, $characterQuestion);
+
+        try {
+            $character = $this->client->getCharacter($characterName);
+        } catch (ApiException $e) {
+            $io->error($e->getMessage());
+
+            return Command::FAILURE;
+        }
+
+        $currentInventoryCount = $character->currentInventoryCount();
+        $inventoryMaxItems     = $character->inventory_max_items;
+        $miningLevel           = $character->mining_level;
+
+        if ($currentInventoryCount === $inventoryMaxItems) {
             $io->warning("Inventory full!");
 
             return Command::SUCCESS;
         }
 
         $io->comment(
-            "Starting inventory: ({$currentInventory}/{$maxInventory})"
+            "Starting inventory: ({$currentInventoryCount}/{$inventoryMaxItems})"
                 . PHP_EOL
-                . "Finding closest mining resource for <info>{$character}</info> (Mining Lvl {$miningLevel})"
+                . "Finding closest mining resource for <info>{$characterName}</info> (Mining Lvl {$miningLevel})"
         );
 
-        $resourcesResponse = $resourceService->resources(
-            $this->client,
-            'mining',
-            $miningLevel
-        );
+        try {
+            $resources = $this->client->getAllResources([
+                Resource::SKILL     => 'mining',
+                Resource::MAX_LEVEL => $miningLevel,
+            ]);
+        } catch (ApiException $e) {
+            $io->error($e->getMessage());
 
-        if ($resourcesResponse->has('error')) {
-            return $responseHelper->handleError($resourcesResponse, $io);
+            return Command::FAILURE;
         }
 
-        $resource = $resourcesResponse->sortByDesc('level')->first() ?? null;
+        $resource = $resources->sortByDesc('level')->first() ?? null;
 
         if (!$resource) {
             $io->warning("No gatherable resources found for mining skill at level {$miningLevel}");
@@ -99,80 +103,72 @@ class MiningCommand
             return Command::SUCCESS;
         }
 
-        $maps = $mapService->maps($this->client, $resource['code'], 'resource');
+        try {
+            $maps = $this->client->getMaps(
+                [
+                    Map::CONTENT_CODE => $resource->code,
+                    Map::CONTENT_TYPE => 'resource',
+                ],
+                $character
+            );
+        } catch (ApiException $e) {
+            $io->error($e->getMessage());
 
-        if ($maps->has('error')) {
-            return $responseHelper->handleError($maps, $io);
+            return Command::FAILURE;
         }
 
-        $characterX = $characterResponse->get('x');
-        $characterY = $characterResponse->get('y');
-
-        $nearestMap = $characterService->mapNearestToCharacter(
-            $maps,
-            $characterX,
-            $characterY
-        );
-
-        if (!$nearestMap) {
-            $io->warning("No valid resource maps found for {$resource['name']}");
+        if ($maps->isEmpty()) {
+            $io->warning("No valid resource maps found for {$resource->name}");
 
             return Command::SUCCESS;
         }
 
-        if ($nearestMap['x'] !== $characterX || $nearestMap['y'] !== $characterY) {
-            $io->comment("Moving character to ({$nearestMap['x']}, {$nearestMap['y']})");
-
-            $moveResponse = $mapService->move(
-                $this->client,
-                $character,
-                $nearestMap['x'],
-                $nearestMap['y'],
-                $nearestMap['map_id']
-            );
-
-            if ($moveResponse->has('error')) {
-                return $responseHelper->handleError($moveResponse, $io);
+        foreach ($maps as $map) {
+            if ($map->map_id === $character->map_id) {
+                break;
             }
 
-            if ($moveResponse->has('cooldown')) {
-                $cooldown = $moveResponse->get('cooldown');
+            try {
+                $io->comment("Moving character to ({$map->x}, {$map->y})");
 
-                $cooldownHelper->handleCooldown($cooldown, $io, $output);
+                [$character, $cooldown] = $this->client->moveCharacter(
+                    $character,
+                    $map->map_id
+                );
+
+                $cooldownHelper->handleCooldown($cooldown);
+            } catch (ConditionsNotMetException $e) {
+                continue;
+            } catch (ApiException $e) {
+                $io->error($e->getMessage());
+
+                return Command::FAILURE;
             }
         }
 
         $items = collect();
         $xpGained = 0;
 
-        while ($currentInventory < $maxInventory) {
-            $gatherResponse = $this->client->gatherResource($character);
+        while ($currentInventoryCount < $inventoryMaxItems) {
+            try {
+                [$character, $cooldown, $details] = $this->client->gatherResource($character);
+            } catch (ApiException $e) {
+                $io->error($e->getMessage());
 
-            if ($gatherResponse->has('error')) {
-                return $responseHelper->handleError($gatherResponse, $io);
+                return Command::FAILURE;
             }
 
-            if ($gatherResponse->has('cooldown')) {
-                $cooldown = $gatherResponse->get('cooldown');
+            $cooldownHelper->handleCooldown($cooldown);
 
-                $cooldownHelper->handleCooldown($cooldown, $io, $output);
-            }
+            $items = $items->merge($details->items);
+            $xpGained += $details->xp;
 
-            $details = $gatherResponse->get('details');
-
-            // if ($gatherResponse->get('character')['mining_level'] > $miningLevel) {
-            // @TODO: Check if user leveled up and consider checking highest level resource again.
-            // }
-
-            $items->push($details['items']);
-            $xpGained += $details['xp'];
-
-            $currentInventory = collect($gatherResponse->get('character')['inventory'])->sum('quantity');
+            $currentInventoryCount = $character->currentInventoryCount();
         }
 
-        $gatheredItems = $itemService->listItems($items);
+        $groupedDrops = $dropHelper->groupTotalsByCode($items);
 
-        $gatheredItemsString = $gatheredItems
+        $gatheredItemsString = $groupedDrops
             ->map(fn($item) => "{$item['code']} ({$item['quantity']})")
             ->implode(', ');
 
@@ -180,41 +176,65 @@ class MiningCommand
             "Total XP gained: {$xpGained}" . PHP_EOL . "Items gathered: " . $gatheredItemsString
         );
 
-        // @TODO: Get nearest bank location first.
+        if ($items->isEmpty()) {
+            IoBlocks::info("No items to deposit", $io);
 
-        $moveResponse = $mapService->move(
-            $this->client,
-            $character,
-            4,
-            1,
-            334
-        );
-
-        if ($moveResponse->has('error')) {
-            return $responseHelper->handleError($moveResponse, $io);
+            return Command::SUCCESS;
         }
 
-        if ($moveResponse->has('cooldown')) {
-            $cooldown = $moveResponse->get('cooldown');
+        try {
+            $maps = $this->client->getMaps(
+                [Map::CONTENT_TYPE => 'bank'],
+                $character
+            );
+        } catch (ApiException $e) {
+            $io->error($e->getMessage());
 
-            $cooldownHelper->handleCooldown($cooldown, $io, $output);
+            return Command::FAILURE;
+        }
+
+        if ($maps->isEmpty()) {
+            $io->warning("No valid maps found for a bank");
+
+            return Command::SUCCESS;
+        }
+
+        foreach ($maps as $map) {
+            if ($map->map_id === $character->map_id) {
+                break;
+            }
+
+            try {
+                $io->comment("Moving character to ({$map->x}, {$map->y})");
+
+                [$character, $cooldown] = $this->client->moveCharacter(
+                    $character,
+                    $map->map_id
+                );
+
+                $cooldownHelper->handleCooldown($cooldown);
+            } catch (ConditionsNotMetException $e) {
+                continue;
+            } catch (ApiException $e) {
+                $io->error($e->getMessage());
+
+                return Command::FAILURE;
+            }
         }
 
         $io->comment("Depositing gathered items into the bank");
 
-        $depositResponse = $this->client->depositItems($character, $gatheredItems->toArray());
+        try {
+            [$character, $cooldown] = $this->client->depositItems($characterName, $groupedDrops);
 
-        if ($depositResponse->has('error')) {
-            return $responseHelper->handleError($depositResponse, $io);
+            $cooldownHelper->handleCooldown($cooldown);
+        } catch (ApiException $e) {
+            $io->error($e->getMessage());
+
+            return Command::FAILURE;
         }
 
-        if ($depositResponse->has('cooldown')) {
-            $cooldown = $depositResponse->get('cooldown');
-
-            $cooldownHelper->handleCooldown($cooldown, $io, $output);
-        }
-
-        $io->success("Deposit successful! This command can now be run again");
+        $io->success("Deposit successful!");
 
         return Command::SUCCESS;
     }

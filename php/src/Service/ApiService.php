@@ -4,19 +4,27 @@ namespace App\Service;
 
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use App\Enums\Endpoints;
-use App\Enums\ItemParams;
-use App\Enums\ResourceParams;
-use App\Enums\MapParams;
-use App\Enums\MoveParams;
+use App\Enums\ErrorCodes;
+use App\Exceptions\ApiException;
+use App\Exceptions\ConditionsNotMetException;
+use App\Models\Character;
+use App\Models\Cooldown;
+use App\Models\Map;
+use App\Models\Resource;
+use App\Models\SkillInfo;
 use Exception;
 use Illuminate\Support\Collection;
 
 class ApiService
 {
-    const NOT_FOUND = 404;
-
+    /**
+     * @var HttpClientInterface
+     */
     private HttpClientInterface $apiClient;
 
+    /**
+     * @param HttpClientInterface $apiClient
+     */
     public function __construct(HttpClientInterface $apiClient)
     {
         $this->apiClient = $apiClient;
@@ -26,24 +34,63 @@ class ApiService
      * @param Endpoints $endpoint
      * @param array $arguments
      * @param array $params
+     * @param array|null $accumulator
      *
-     * @return Collection
+     * @throws ApiException
+     * @return array
      */
-    public function get(Endpoints $endpoint, array $arguments = [], array $params = []): Collection
-    {
+    public function get(
+        Endpoints $endpoint,
+        array $arguments = [],
+        array $params = [],
+        ?array &$accumulator = null
+    ): array {
         $url = $this->buildUrl($endpoint, $arguments, $params);
 
         $response = $this->apiClient->request('GET', $url);
 
         try {
-            $data = $response->toArray()['data'];
+            $data = $response->toArray();
         } catch (Exception $e) {
             $content = $response->getContent(false);
 
             $data = json_decode($content, true);
         }
 
-        return collect($data);
+        if (isset($data['error'])) {
+            $errorMessage = $data['error']['message'] ?? 'An error occurred';
+            $errorCode = $data['error']['code'] ?? 0;
+
+            $message = "{$errorCode}: {$errorMessage}";
+
+            throw new ApiException($message, $errorCode);
+        }
+
+        if (!isset($data['page']) || !isset($data['pages'])) {
+            return $data;
+        }
+
+        if ($accumulator === null) {
+            $accumulator = [];
+        }
+
+        $currentPage = $data['page'];
+        $totalPages  = $data['pages'];
+
+        $accumulator = array_merge($accumulator, $data);
+
+        if ($currentPage < $totalPages) {
+            $params['page'] = $currentPage + 1;
+
+            return $this->get(
+                $endpoint,
+                $arguments,
+                $params,
+                $accumulator
+            );
+        }
+
+        return $accumulator;
     }
 
     /**
@@ -51,99 +98,172 @@ class ApiService
      * @param array $arguments
      * @param array $body
      *
-     * @return Collection
+     * @return array
      */
-    public function post(Endpoints $endpoint, array $arguments = [], array $body = []): Collection
+    public function post(Endpoints $endpoint, array $arguments = [], array $body = []): array
     {
         $url = $this->buildUrl($endpoint, $arguments, []);
 
         $response = $this->apiClient->request('POST', $url, ['json' => $body]);
 
         try {
-            $data = $response->toArray()['data'];
+            $data = $response->toArray();
         } catch (Exception $e) {
             $content = $response->getContent(false);
 
             $data = json_decode($content, true);
         }
 
-        return collect($data);
+        if (isset($data['error'])) {
+            $errorMessage = $data['error']['message'] ?? 'An error occurred';
+            $errorCode = $data['error']['code'] ?? 0;
+
+            $message = "{$errorCode}: {$errorMessage}";
+
+            if ($errorCode === ErrorCodes::ConditionsNotMet) {
+                throw new ConditionsNotMetException($message, $errorCode);
+            }
+
+            throw new ApiException($message, $errorCode);
+        }
+
+        return $data;
+    }
+
+    /**
+     * @return Collection<Character>
+     */
+    public function getMyCharacters(): Collection
+    {
+        $response = $this->get(Endpoints::MyCharacters);
+
+        $characters = collect();
+
+        foreach ($response['data'] as $character) {
+            $characters->push(Character::fromArray($character));
+        }
+
+        return $characters;
+    }
+
+    /**
+     * @param string $characterName
+     *
+     * @return Character
+     */
+    public function getCharacter(string $characterName): Character
+    {
+        $response = $this->get(Endpoints::Characters, [$characterName]);
+
+        return Character::fromArray($response['data']);
     }
 
     /**
      * @param array $params
      *
-     * @return Collection
+     * @return Collection<Resource>
      */
     public function getAllResources(array $params = []): Collection
     {
-        $validParams = $this->areParamsValid($params, ResourceParams::class);
+        $response = $this->get(Endpoints::AllResources, [], $params);
 
-        if (!$validParams) {
-            return collect();
+        $resources = collect();
+
+        foreach ($response['data'] as $resource) {
+            $resources->push(Resource::fromArray($resource));
         }
 
-        return $this->get(Endpoints::AllResources, [], $params);
+        return $resources;
     }
 
     /**
      * @param array $params
+     * @param Character|null $character
      *
-     * @return Collection
+     * @return Collection<Map>
      */
-    public function getMaps(array $params = []): Collection
+    public function getMaps(array $params = [], ?Character $character = null): Collection
     {
-        $validParams = $this->areParamsValid($params, MapParams::class);
+        $response = $this->get(Endpoints::AllMaps, [], $params);
 
-        if (!$validParams) {
-            return collect();
+        $maps = collect();
+
+        foreach ($response['data'] as $map) {
+            $maps->push(Map::fromArray($map));
         }
 
-        return $this->get(Endpoints::AllMaps, [], $params);
+        if ($character) {
+            // Sort maps by nearest to character
+            return $maps
+                ->sortBy(function (Map $map) use ($character) {
+                    return sqrt(
+                        pow($character->x - $map->x, 2) + pow($character->y - $map->y, 2)
+                    );
+                })
+                ->values();
+        }
+
+        return $maps;
     }
 
     /**
-     * @param string $character
-     * @param array $params
+     * @param Character $character
+     * @param int $mapId
      *
-     * @return Collection
+     * @return array
      */
-    public function moveCharacter(string $character, array $params = []): Collection
+    public function moveCharacter(Character $character, int $mapId): array
     {
-        $validParams = $this->areParamsValid($params, MoveParams::class);
+        $response = $this->post(
+            Endpoints::Move,
+            [Character::CHARACTER_NAME => $character->name],
+            [Map::MAP_ID => $mapId]
+        );
 
-        if (!$validParams) {
-            return collect();
-        }
+        $character = Character::fromArray($response['data']['character']);
+        $cooldown  = Cooldown::fromArray($response['data']['cooldown']);
 
-        $body = [];
-
-        foreach ($params as $param) {
-            $body[$param['name']->value] = $param['value'];
-        }
-
-        return $this->post(Endpoints::Move, ['name' => $character], $body);
+        return [$character, $cooldown];
     }
 
     /**
-     * @param string $character
+     * @param Character $character
      *
-     * @return Collection
+     * @return array
      */
-    public function gatherResource(string $character): Collection
+    public function gatherResource(Character $character): array
     {
-        return $this->post(Endpoints::Gathering, ['name' => $character], []);
+        $response = $this->post(
+            Endpoints::Gathering,
+            [Character::CHARACTER_NAME => $character->name],
+            []
+        );
+
+        $character = Character::fromArray($response['data']['character']);
+        $cooldown  = Cooldown::fromArray($response['data']['cooldown']);
+        $details   = SkillInfo::fromArray($response['data']['details']);
+
+        return [$character, $cooldown, $details];
     }
 
     /**
-     * @param string $character
-     * @param array $items
+     * @param Character $character
+     * @param Collection $groupedDrops
      *
-     * @return Collection
+     * @return array
      */
-    public function depositItems(string $character, array $items): Collection
+    public function depositItems(Character $character, Collection $groupedDrops): array
     {
-        return $this->post(Endpoints::DepositItem, ['name' => $character], $items);
+        $response = $this->post(
+            Endpoints::DepositItem,
+            [Character::CHARACTER_NAME => $character->name],
+            $groupedDrops->toArray()
+        );
+
+        $character = Character::fromArray($response['data']['character']);
+        $cooldown  = Cooldown::fromArray($response['data']['cooldown']);
+
+        return [$character, $cooldown];
     }
 
     /**
@@ -175,10 +295,10 @@ class ApiService
         if ($params) {
             $url = "{$url}?";
 
-            foreach ($params as $param) {
-                $url .= "{$param['name']->value}={$param['value']}";
+            foreach ($params as $name => $value) {
+                $url .= "{$name}={$value}";
 
-                if (end($params) !== $param) {
+                if (end($params) !== $value) {
                     $url .= "&";
                 }
             }
@@ -198,30 +318,5 @@ class ApiService
         }
 
         return null;
-    }
-
-    /**
-     * @param array $params
-     * @param string $enumClass
-     *
-     * @return bool
-     */
-    private function areParamsValid(array $params, string $enumClass): bool
-    {
-        foreach ($params as $param) {
-            if (!$param['name'] || !($param['name'] instanceof $enumClass)) {
-                throw new Exception("Invalid parameter type. Expected instance of {$enumClass} enum.");
-
-                return false;
-            }
-
-            if (!isset($param['value'])) {
-                throw new Exception("Invalid parameter type. Expected value for {$param['name']}.");
-
-                return false;
-            }
-        }
-
-        return true;
     }
 }

@@ -1,20 +1,19 @@
 <?php
 
-namespace App\Service;
+namespace App\Helpers;
 
 use Illuminate\Support\Collection;
 
-class ItemService
+class DropHelper
 {
     /**
-     * @param Collection $items
+     * @param Collection $details
      *
      * @return Collection
      */
-    public function listItems(Collection $items): Collection
+    public function groupTotalsByCode(Collection $details): Collection
     {
-        return $items
-            ->collapse()
+        return $details
             ->groupBy('code')
             ->map(function ($group, $code) {
                 return [
