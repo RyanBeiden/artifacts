@@ -1,0 +1,6 @@
+{
+  "name": "PHP environment",
+  "image": "mcr.microsoft.com/vscode/devcontainers/php:8.2",
+  "postCreateCommand": "composer install"
+}
+
