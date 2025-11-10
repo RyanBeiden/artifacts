@@ -7,5 +7,5 @@
     "BASE_URI": "${localEnv:BASE_URI}",
     "DISCORD_TOKEN": "${localEnv:DISCORD_TOKEN}"
   },
-  "forwardPorts": [8000]
+  "forwardPorts": [9000]
 }
