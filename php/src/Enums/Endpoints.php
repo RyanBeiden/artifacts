@@ -6,19 +6,33 @@ enum Endpoints: string
 {
     /**
     |----------------------------------------------------------------------------------------------
+    | Server
+    |----------------------------------------------------------------------------------------------
+    */
+    /** @see https://api.artifactsmmo.com/docs/#/operations/get_server_details__get */
+    case ServerDetails = '/';
+
+    /**
+    |----------------------------------------------------------------------------------------------
     | My Account
     |----------------------------------------------------------------------------------------------
     */
-
     /** @see https://api.artifactsmmo.com/docs/#/operations/get_account_details_my_details_get */
-    case AccountDetails = 'my/details';
+    case MyDetails = 'my/details';
+
+    /**
+    |----------------------------------------------------------------------------------------------
+    | Accounts
+    |----------------------------------------------------------------------------------------------
+    */
+    /** @see https://api.artifactsmmo.com/docs/#/operations/get_account_achievements_accounts__account__achievements_get */
+    case AccountAchievements = 'accounts/{account}/achievements';
 
     /**
     |----------------------------------------------------------------------------------------------
     | My Characters
     |----------------------------------------------------------------------------------------------
     */
-
     /** @see https://api.artifactsmmo.com/docs/#/operations/get_my_characters_my_characters_get */
     case MyCharacters = 'my/characters';
     /** @see https://api.artifactsmmo.com/docs/#/operations/action_move_my__name__action_move_post */
@@ -33,7 +47,6 @@ enum Endpoints: string
     | Characters
     |----------------------------------------------------------------------------------------------
     */
-
     /** @see https://api.artifactsmmo.com/docs/#/operations/get_character_characters__name__get */
     case Characters = 'characters';
 
@@ -42,7 +55,6 @@ enum Endpoints: string
     | Resources
     |----------------------------------------------------------------------------------------------
     */
-
     /** @see https://api.artifactsmmo.com/docs/#/operations/get_all_resources_resources_get */
     case AllResources = 'resources';
 
@@ -51,7 +63,6 @@ enum Endpoints: string
     | Maps
     |----------------------------------------------------------------------------------------------
     */
-
     /** @see https://api.artifactsmmo.com/docs/#/operations/get_all_maps_maps_get */
     case AllMaps = 'maps';
 }

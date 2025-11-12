@@ -2,9 +2,8 @@
 
 namespace App\Command\Characters;
 
-use App\Enums\Endpoints;
+use App\Exceptions\ApiException;
 use App\Service\ApiService;
-use App\Service\CharacterService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\FormatterHelper;
@@ -33,37 +32,32 @@ class InfoCommand
         $questionHelper = new QuestionHelper();
         $formatterHelper = new FormatterHelper();
 
-        $myCharacters = $this->client->get(Endpoints::MyCharacters)
-            ->pluck('name')
-            ->toArray();
-
-        $formattedLine = $formatterHelper->formatSection(
-            "Choose a character",
-            "",
-            "question"
-        );
-
-        $characterQuestion = new ChoiceQuestion($formattedLine, $myCharacters, 0);
-        $characterQuestion->setErrorMessage('Character name is invalid.');
-
-        $character = $questionHelper->ask($input, $output, $characterQuestion);
-
-        $response = $this->client->get(Endpoints::Characters, [$character]);
-
-        if ($response->has('error')) {
-            $error = $response->get('error');
-
-            $io->error("{$error['code']}: {$error['message']}");
+        try {
+            $myCharacters   = $this->client->getMyCharacters();
+            $characterNames = $myCharacters->pluck('name')->toArray();
+        } catch (ApiException $e) {
+            $io->error($e->getMessage());
 
             return Command::FAILURE;
-        };
+        }
 
-        $name = $response->get('name', '');
-        $level = $response->get('level', 0);
-        
+        $formattedLine = $formatterHelper->formatSection("Choose a character", "", "question");
+        $question      = new ChoiceQuestion($formattedLine, $characterNames, 0);
+        $question->setErrorMessage('Character does not exist');
+
+        $characterName = $questionHelper->ask($input, $output, $question);
+
+        try {
+            $character = $this->client->getCharacter($characterName);
+        } catch (ApiException $e) {
+            $io->error($e->getMessage());
+
+            return Command::FAILURE;
+        }
+
         $formattedLine = $formatterHelper->formatSection(
-            "{$name}",
-            "You are level {$level}"
+            "{$character->name}",
+            "Level {$character->level}"
         );
 
         $output->writeln($formattedLine);

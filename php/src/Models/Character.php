@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Support\Collection;
+
 class Character
 {
     // Path parameter options
@@ -91,7 +93,7 @@ class Character
         public readonly int $task_progress,
         public readonly int $task_total,
         public readonly int $inventory_max_items,
-        public readonly array $inventory,
+        public readonly Collection $inventory,
     ) {}
 
     /**
@@ -185,7 +187,8 @@ class Character
             task_progress: $data['task_progress'] ?? 0,
             task_total: $data['task_total'] ?? 0,
             inventory_max_items: $data['inventory_max_items'] ?? 0,
-            inventory: $data['inventory'] ?? [],
+            inventory: collect($data['inventory'] ?? [])
+                ->map(fn($item) => InventorySlot::fromArray($item)),
         );
     }
 

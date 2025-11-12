@@ -7,11 +7,15 @@ use App\Enums\Endpoints;
 use App\Enums\ErrorCodes;
 use App\Exceptions\ApiException;
 use App\Exceptions\ConditionsNotMetException;
+use App\Models\Account;
+use App\Models\Achievement;
 use App\Models\Character;
 use App\Models\Cooldown;
 use App\Models\Map;
+use App\Models\MyAccountDetail;
 use App\Models\Resource;
 use App\Models\SkillInfo;
+use App\Models\Status;
 use Exception;
 use Illuminate\Support\Collection;
 
@@ -77,7 +81,12 @@ class ApiService
         $currentPage = $data['page'];
         $totalPages  = $data['pages'];
 
-        $accumulator = array_merge($accumulator, $data);
+        $filteredData = array_diff_key(
+            $data,
+            array_flip(['page', 'pages', 'total', 'size'])
+        );
+
+        $accumulator = array_merge_recursive($accumulator, $filteredData);
 
         if ($currentPage < $totalPages) {
             $params['page'] = $currentPage + 1;
@@ -128,6 +137,47 @@ class ApiService
         }
 
         return $data;
+    }
+
+    /**
+     * @return Status
+     */
+    public function getServerDetails(): Status
+    {
+        $response = $this->get(Endpoints::ServerDetails);
+
+        return Status::fromArray($response['data']);
+    }
+
+    /**
+     * @return MyAccountDetail
+     */
+    public function getMyDetails(): MyAccountDetail
+    {
+        $response = $this->get(Endpoints::MyDetails);
+
+        return MyAccountDetail::fromArray($response['data']);
+    }
+
+    /**
+     * @param MyAccountDetail $myAccountDetail
+     *
+     * @return Collection<Achievement>
+     */
+    public function getAccountAchievements(MyAccountDetail $myAccountDetail): Collection
+    {
+        $response = $this->get(
+            Endpoints::AccountAchievements,
+            [Account::ACCOUNT => $myAccountDetail->username],
+        );
+
+        $achievements = collect();
+
+        foreach ($response['data'] as $achievement) {
+            $achievements->push(Achievement::fromArray($achievement));
+        }
+
+        return $achievements;
     }
 
     /**
@@ -248,16 +298,16 @@ class ApiService
 
     /**
      * @param Character $character
-     * @param Collection $groupedDrops
+     * @param Collection $items
      *
      * @return array
      */
-    public function depositItems(Character $character, Collection $groupedDrops): array
+    public function depositItems(Character $character, Collection $items): array
     {
         $response = $this->post(
             Endpoints::DepositItem,
             [Character::CHARACTER_NAME => $character->name],
-            $groupedDrops->toArray()
+            $items->toArray()
         );
 
         $character = Character::fromArray($response['data']['character']);

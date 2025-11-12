@@ -4,16 +4,16 @@ namespace App\Helpers;
 
 use Illuminate\Support\Collection;
 
-class DropHelper
+class ItemHelper
 {
     /**
-     * @param Collection $details
+     * @param Collection $items
      *
      * @return Collection
      */
-    public function groupTotalsByCode(Collection $details): Collection
+    public function groupTotalsByCode(Collection $items): Collection
     {
-        return $details
+        return $items
             ->groupBy('code')
             ->map(function ($group, $code) {
                 return [
