@@ -2,10 +2,5 @@
   "name": "PHP Dev Container",
   "image": "mcr.microsoft.com/vscode/devcontainers/php:8.2",
   "postCreateCommand": "cd php && ../bootstrap.sh && composer install",
-  "remoteEnv": {
-    "TOKEN": "${localEnv:TOKEN}",
-    "BASE_URI": "${localEnv:BASE_URI}",
-    "DISCORD_TOKEN": "${localEnv:DISCORD_TOKEN}"
-  },
   "forwardPorts": [9000]
 }
